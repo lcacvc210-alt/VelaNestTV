@@ -1,3 +1,4 @@
+import {browseCatalog} from './catalog.mjs';
 import http from 'node:http';
 import dgram from 'node:dgram';
 import fs from 'node:fs';
@@ -17,7 +18,7 @@ const backendId=fs.readFileSync(idFile,'utf8').trim();
 const cacheFile=path.join(data,'catalog.json');
 let store={items:[],sections:[],updated:0};
 try{store=JSON.parse(fs.readFileSync(cacheFile,'utf8'));}catch{}
-let sources=[],cookie='',refreshing=false;
+let sources=[],cookie='',refreshing=false;let refreshTask=null;let refreshState={running:false,phase:'idle',checks:[],startedAt:0,finishedAt:0,error:''};
 const sessionCache=new Map(),suggestCache=new Map();
 const clean=s=>String(s||'').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').trim();
 const normalize=s=>clean(s).toLowerCase().replace(/[\s·:：\-_（）()]/g,'');
@@ -28,14 +29,16 @@ async function request(url,options={}){const r=await fetch(url,{...options,signa
 async function login(){const password=process.env.PASSWORD;if(!password)throw Error('Set PASSWORD in companion/.env to match backend/.env.local');const r=await fetch(core+'/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password})});if(!r.ok)throw Error('后台登录失败');cookie=r.headers.get('set-cookie')?.split(';')[0]||'';sources=(await request(core+'/api/status')).defaultSources;}
 async function coreGet(p){return request(core+p,{headers:{cookie}});}
 function persist(){store.updated=Date.now();fs.writeFileSync(cacheFile,JSON.stringify(store));}
-function sourceItem(v,s){return {name:v.vod_name,pic:v.vod_pic,year:String(v.vod_year||''),typeName:v.type_name||'',remarks:v.vod_remarks||'',desc:clean(v.vod_content),vodId:String(v.vod_id),sourceKey:s.key,sourceName:s.name,sourceUrl:s.url};}
-async function refresh(){
- if(refreshing)return;refreshing=true;
+function sourceItem(v,s){return {name:v.vod_name,pic:v.vod_pic,year:String(v.vod_year||''),typeName:v.type_name||'',remarks:v.vod_remarks||'',desc:clean(v.vod_content),genres:v.vod_class||'',updatedAt:Date.parse(v.vod_time||'')||0,vodId:String(v.vod_id),sourceKey:s.key,sourceName:s.name,sourceUrl:s.url};}
+function refresh(){if(refreshTask)return refreshTask;refreshTask=performRefresh().finally(()=>{refreshTask=null;});return refreshTask;}
+async function performRefresh(){
+ refreshing=true;refreshState={running:true,phase:'checking',checks:[],startedAt:Date.now(),finishedAt:0,error:''};
  try{
   await login();const collected=[];
   for(let page=1;page<=8;page++){
    const result=await Promise.allSettled(sources.map(async s=>{const j=await request(s.url.replace(/\/+$/,'')+'?ac=detail&pg='+page,{timeout:9000});return(j.list||[]).filter(v=>!/伦理|情色|成人|福利/.test(v.type_name||'')).map(v=>sourceItem(v,s));}));
    for(const r of result)if(r.status==='fulfilled')collected.push(...r.value);
+   if(page===1){refreshState.checks=result.map((r,i)=>({name:sources[i].name,ok:r.status==='fulfilled'&&r.value.length>0,items:r.status==='fulfilled'?r.value.length:0}));refreshState.phase='catalog';}
    if(page===1){store.items=merge([...store.items,...collected]);persist();}
    await new Promise(r=>setTimeout(r,120));
   }
@@ -44,11 +47,10 @@ async function refresh(){
    try{if(process.env.EXTERNAL_METADATA==='false')continue;const r=await coreGet(`/api/douban?type=${type}&tag=${encodeURIComponent(tag)}&pageSize=24`);const list=(r.items||[]).map(v=>({name:v.title,pic:v.cover||v.pic,year:String(v.year||''),typeName:type==='movie'?'电影':tag==='日本动画'?'动漫':'电视剧',remarks:v.rate?'豆瓣 '+v.rate:'',desc:'',recommendation:true}));if(list.length){sections.push({title:label,items:list});collected.push(...list);}}
    catch(e){console.log('recommendation fallback',label,e.message);}
   }
-  store.items=merge([...store.items,...collected]).slice(-18000);store.sections=sections;persist();console.log('catalog refreshed',store.items.length);
- }catch(e){console.error('refresh failed:',e.message);}finally{refreshing=false;}
+  store.items=merge([...store.items,...collected]).slice(-18000);if(sections.length){store.sections=sections;store.hotUpdated=Date.now();}persist();refreshState.phase=refreshState.checks.some(s=>s.ok)||sources.length===0?'done':'error';if(refreshState.phase==='error')refreshState.error='所有已配置来源均未取得目录，保留现有片单';console.log('catalog refreshed',store.items.length);
+ }catch(e){console.error('refresh failed:',e.message);refreshState.phase='error';refreshState.error='后台刷新失败，请检查配置或网络';}finally{refreshing=false;refreshState.running=false;refreshState.finishedAt=Date.now();}
 }
-function isType(v,category){const type=v.typeName||'';if(category==='movie')return /电影|动作|喜剧|科幻|恐怖|剧情|爱情|纪录|战争|悬疑|惊悚/.test(type)&&!/剧集|电视剧|国产剧|连续|短剧/.test(type);if(category==='tv')return /剧|连续/.test(type)&&!/短剧/.test(type);if(category==='anime')return /动漫|动画/.test(type);if(category==='variety')return /综艺/.test(type);return true;}
-function browse(category,page=0){const list=store.items.filter(v=>isType(v,category));const sections=category==='home'?store.sections:[];return {items:list.slice(page*30,page*30+30).map(publicItem),sections:sections.map(s=>({...s,items:s.items.slice(0,12)})),page,hasMore:(page+1)*30<list.length,total:list.length,updated:store.updated,refreshing};}
+function browse(category,page=0,filters={}){return {...browseCatalog(store,category,page,filters),refreshing};}
 function distanceOne(a,b){if(Math.abs(a.length-b.length)>1)return false;let i=0,j=0,n=0;while(i<a.length&&j<b.length){if(a[i]===b[j]){i++;j++;}else{if(++n>1)return false;if(a.length>=b.length)i++;if(b.length>=a.length)j++;}}return n+(a.length-i)+(b.length-j)<=1;}
 function localSuggestions(query){const q=normalize(query);if(!q)return [];return store.items.map(v=>({v,score:v._name===q?100:v._initial===q?98:v._py===q?97:v._name.startsWith(q)?90:v._initial.startsWith(q)?85:v._py.startsWith(q)?82:v._name.includes(q)?75:v._py.includes(q)?65:q.length>=3&&distanceOne(q,v._initial)?45:0})).filter(x=>x.score).sort((a,b)=>b.score-a.score).slice(0,16).map(x=>({...publicItem(x.v),match:x.score===98?'首字母匹配':x.score===97?'全拼匹配':x.score===45?'相近片名':'片名联想'}));}
 async function suggestions(query){
@@ -77,7 +79,8 @@ const server=http.createServer(async(req,res)=>{
   if(handleNasStream(req,res,u))return;
   if(!await verified(req)){json(res,401,{error:'需要登录'});return;}
   if(u.pathname==='/tv/nas'){try{json(res,200,listNas(u.searchParams.get('dir')||'',req.headers.host));}catch(e){json(res,400,{error:e.message});}return;}
-  if(u.pathname==='/tv/catalog'){json(res,200,browse(u.searchParams.get('category')||'home',Math.min(200,Math.max(0,Number(u.searchParams.get('page'))||0))));return;}
+  if(u.pathname==='/tv/sources/refresh'){if(req.method==='POST'){const busy=refreshing;refresh();json(res,202,{...refreshState,alreadyRunning:busy});}else if(req.method==='GET')json(res,200,{...refreshState,indexed:store.items.length});else json(res,405,{error:'Method not allowed'});return;}
+  if(u.pathname==='/tv/catalog'){json(res,200,browse(u.searchParams.get('category')||'home',Math.min(200,Math.max(0,Number(u.searchParams.get('page'))||0)),{genre:u.searchParams.get('genre'),year:u.searchParams.get('year'),sort:u.searchParams.get('sort')}));return;}
   if(u.pathname==='/tv/suggest'){json(res,200,await suggestions(u.searchParams.get('q')||''));return;}
   json(res,404,{error:'不存在的接口'});
  }catch(e){json(res,502,{error:e.message});}

@@ -17,5 +17,8 @@ test('companion isolated authentication, signed NAS ranges and discovery',{timeo
  const bad=new URL(url);bad.searchParams.set('sig','tampered');assert.equal((await fetch(bad)).status,403);
  assert.equal((await fetch(base+'/tv/nas?dir=..',{headers})).status,400);
  r=await fetch(base+'/tv/catalog?category=movie',{headers});assert.equal(r.status,200);assert.deepEqual((await r.json()).items,[]);
+ assert.equal((await fetch(base+'/tv/sources/refresh',{method:'POST'})).status,401);
+ let update=await fetch(base+'/tv/sources/refresh',{method:'POST',headers});assert.equal(update.status,202);
+ for(let i=0;i<40;i++){update=await fetch(base+'/tv/sources/refresh',{headers});const state=await update.json();if(!state.running){assert.equal(state.phase,'done');assert.deepEqual(state.checks,[]);break;}assert(i<39);await new Promise(r=>setTimeout(r,100));}
  const socket=dgram.createSocket('udp4');t.after(()=>socket.close());socket.bind(0,'127.0.0.1');await once(socket,'listening');const response=once(socket,'message');socket.send(Buffer.from('PRIVATE_CINEMA_DISCOVER_V2'),udpPort,'127.0.0.1');const [message]=await Promise.race([response,new Promise((_,reject)=>setTimeout(()=>reject(Error('discovery timeout')),2000))]);const found=JSON.parse(message);assert.equal(found.port,corePort);assert.equal(found.companionPort,port);
 });

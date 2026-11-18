@@ -35,10 +35,10 @@ if (!(Test-Path $keyPath)) {
   [IO.File]::WriteAllText($passwordPath,$signingPassword,[Text.Encoding]::ASCII)
   Run-Tool "$jdk\keytool.exe" @('-genkeypair','-keystore',$keyPath,'-storepass',$signingPassword,'-keypass',$signingPassword,'-alias','private-cinema','-keyalg','RSA','-keysize','2048','-validity','10000','-dname','CN=Private Cinema, OU=Home, O=LC, C=CN')
 }
-Run-Tool "$jdk\java.exe" @('-jar',"$tools\lib\apksigner.jar",'sign','--ks',$keyPath,'--ks-key-alias','private-cinema','--ks-pass',"file:$passwordPath",'--out','dist\VelaNestTV-3.1.1.apk','build\aligned.apk')
-Run-Tool "$jdk\java.exe" @('-jar',"$tools\lib\apksigner.jar",'verify','--verbose','--print-certs','dist\VelaNestTV-3.1.1.apk')
-Run-Tool "$tools\aapt.exe" @('dump','badging','dist\VelaNestTV-3.1.1.apk')
-Get-FileHash dist\VelaNestTV-3.1.1.apk -Algorithm SHA256 | Format-List
+Run-Tool "$jdk\java.exe" @('-jar',"$tools\lib\apksigner.jar",'sign','--ks',$keyPath,'--ks-key-alias','private-cinema','--ks-pass',"file:$passwordPath",'--out','dist\VelaNestTV-3.3.0.apk','build\aligned.apk')
+Run-Tool "$jdk\java.exe" @('-jar',"$tools\lib\apksigner.jar",'verify','--verbose','--print-certs','dist\VelaNestTV-3.3.0.apk')
+Run-Tool "$tools\aapt.exe" @('dump','badging','dist\VelaNestTV-3.3.0.apk')
+Get-FileHash dist\VelaNestTV-3.3.0.apk -Algorithm SHA256 | Format-List
 
 
 

@@ -4,7 +4,7 @@
 
 A remote-friendly Android TV client with a self-hosted LibreTV backend and a lightweight companion service for search suggestions, recommendations, LAN discovery and a read-only local media library.
 
-**Current version: 3.1.1. License: AGPL-3.0-or-later.** This repository contains the client, companion and backend source. It does not include passwords, signing keys, videos or a working third-party source list.
+**Current version: 3.3.0. License: AGPL-3.0-or-later.** This repository contains the client, companion and backend source. It does not include passwords, signing keys, videos or a working third-party source list.
 
 ![VelaNestTV branding](branding/brand-preview.png)
 
@@ -55,3 +55,8 @@ The project is a software client/server tool. Provide your own authorized media 
 
 Version suggestions and support: [lcacvc@163.com](mailto:lcacvc@163.com). See the Chinese README for redacted screenshots and architecture.
 
+
+
+## 3.3.0
+
+[Release notes and maintenance setup](docs/RELEASE-3.3.0.md) · [Download APK](https://github.com/lcacvc210-alt/VelaNestTV/releases/tag/v3.3.0)

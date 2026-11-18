@@ -2,7 +2,7 @@
 
 一套面向家庭大屏的开源观影方案：电视负责浏览与播放，电脑负责搜索聚合、片单整理和本地文件服务。以遥控器为主要操作方式，支持在线点播、直播订阅和电脑本地影库。
 
-**版本：3.1.1 · 许可证：AGPL-3.0-or-later · [English](README.en.md)**
+**版本：3.3.0 · 许可证：AGPL-3.0-or-later · [English](README.en.md)**
 
 ![VelaNestTV 品牌](branding/brand-preview.png)
 
@@ -89,3 +89,8 @@
 
 项目面向可信家庭局域网，勿直接映射到公网。网络、片源和电视解码能力影响流畅度，不保证所有 4K 内容或所有频道可用。外挂字幕、转码、自动片源巡检尚未实现；外部推荐与联想服务可能限流。公开版已通过的检查及尚未验证的范围见验证记录。
 
+
+
+## 3.3.0
+
+[Release notes and maintenance setup](docs/RELEASE-3.3.0.md) · [Download APK](https://github.com/lcacvc210-alt/VelaNestTV/releases/tag/v3.3.0)

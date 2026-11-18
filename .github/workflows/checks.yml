@@ -15,4 +15,4 @@ jobs:
       - run: npm run typecheck --prefix backend
       - run: npm test --prefix backend
       - run: npm run build --prefix backend
-      - run: node --test scripts/smoke.test.mjs scripts/backend-smoke.test.mjs
+      - run: node --test scripts/catalog.test.mjs scripts/smoke.test.mjs scripts/backend-smoke.test.mjs
